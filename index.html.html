@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="zh" translate="no">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="google" content="notranslate" />
+  <title>小六壬占卜</title>
+  
+  <!-- 全局脚本：处理音乐、背景、付费 -->
+  <script>
+    // ==================== 1. 背景图管理 ====================
+    const modalBackgrounds = {
+      '大安': ['/modal-peace-1.jpg', '/modal-peace-2.jpg'],
+      '留连': ['/modal-linger-1.jpg', '/modal-mist-forest.jpg'],
+      '速喜': ['/modal-joy-1.jpg', '/modal-sunrise.jpg'],
+      '赤口': ['/modal-storm.jpg', '/modal-dark.jpg'],
+      '小吉': ['/modal-luck-1.jpg', '/modal-stream.jpg'],
+      '空亡': ['/modal-void-1.jpg', '/modal-starry.jpg'],
+      'default': ['/modal-moon-lake.jpg', '/modal-bamboo.jpg', '/modal-lotus.jpg']
+    };
+
+    // ==================== 2. 音乐播放 ====================
+    window.playBackgroundMusic = function(result) {
+      // 找到已有的 audio 元素
+      let audio = document.querySelector('audio[src="/bgm.mp3"]');
+      if (!audio) {
+        // 如果没有，创建一个
+        audio = document.createElement('audio');
+        audio.src = '/bgm.mp3';
+        audio.loop = true;
+        document.body.appendChild(audio);
+      }
+      
+      // 设置30%音量并播放
+      audio.volume = 0.3;
+      audio.play().catch(e => console.log('播放失败', e));
+      
+      // 同时设置背景图
+      setModalBackground(result);
+    };
+
+    // ==================== 3. 设置弹窗背景 ====================
+    function setModalBackground(result) {
+      // 选择图片池
+      let pool = modalBackgrounds[result] || modalBackgrounds.default;
+      const bgImage = pool[Math.floor(Math.random() * pool.length)];
+      
+      // 保存到全局
+      window.__modalBgImage = bgImage;
+      
+      // 立即应用到当前弹窗（如果存在）
+      const modal = document.querySelector('.fixed.inset-0.z-\\[100\\] .relative');
+      if (modal) {
+        modal.style.backgroundImage = `url('${bgImage}')`;
+        modal.style.backgroundSize = 'cover';
+      }
+    }
+
+    // ==================== 4. 监听结果点击 ====================
+    document.addEventListener('click', function(e) {
+      // 查找被点击的元素是否是转盘结果
+      const resultElement = e.target.closest('[class*="result"], [class*="Result"], .cursor-pointer');
+      if (resultElement) {
+        // 尝试获取结果文字（大安/留连/速喜等）
+        const text = resultElement.textContent || '';
+        const result = text.match(/(大安|留连|速喜|赤口|小吉|空亡)/);
+        if (result) {
+          window.playBackgroundMusic(result[0]);
+        }
+      }
+    });
+
+    // ==================== 5. 观察弹窗出现 ====================
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.addedNodes.length) {
+          mutation.addedNodes.forEach((node) => {
+            if (node.nodeType === 1) {
+              // 检测弹窗出现
+              if (node.querySelector('input[type="password"]') || 
+                  node.textContent.includes('password') ||
+                  node.textContent.includes('密码')) {
+                
+                // 弹窗出现后，修改其结构，添加付费/密码二选一
+                setTimeout(() => {
+                  enhanceModal(node);
+                }, 100);
+              }
+            }
+          });
+        }
+      });
+    });
+    
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    // ==================== 6. 增强弹窗 ====================
+    function enhanceModal(modalNode) {
+      // 找到弹窗内容区域
+      const contentArea = modalNode.querySelector('.p-6') || modalNode;
+      
+      // 设置背景图
+      if (window.__modalBgImage) {
+        modalNode.querySelector('.relative')?.style.setProperty('background-image', `url('${window.__modalBgImage}')`, 'important');
+      }
+      
+      // 添加付费/密码选项（如果还没有的话）
+      if (!modalNode.querySelector('.payment-options')) {
+        const paymentDiv = document.createElement('div');
+        paymentDiv.className = 'payment-options mt-4 border-t pt-4';
+        paymentDiv.innerHTML = `
+          <div class="flex gap-2 mb-3">
+            <button class="tab-btn active flex-1 py-2 bg-amber-500 text-white rounded" data-tab="password">🔑 密码解锁</button>
+            <button class="tab-btn flex-1 py-2 bg-gray-200 dark:bg-gray-700 rounded" data-tab="wechat">💰 微信支付 2元</button>
+          </div>
+          
+          <div id="password-tab" class="tab-content">
+            <p class="text-sm opacity-70 mb-2">输入密码 "liuren2026" 解锁</p>
+            <div class="flex gap-2">
+              <input type="password" placeholder="请输入密码" class="flex-1 px-3 py-2 border rounded-lg">
+              <button class="px-4 py-2 bg-amber-500 text-white rounded-lg">确认</button>
+            </div>
+          </div>
+          
+          <div id="wechat-tab" class="tab-content hidden">
+            <p class="text-sm text-center mb-2">微信扫码支付 2元</p>
+            <div class="flex justify-center">
+              <img src="/wechat-qr.jpg" alt="微信收款码" class="w-32 h-32 border rounded-lg">
+            </div>
+            <p class="text-xs text-center mt-2 opacity-60">支付后自动解锁</p>
+          </div>
+        `;
+        
+        // 插入到内容区前面
+        contentArea.insertBefore(paymentDiv, contentArea.firstChild);
+        
+        // 添加选项卡切换功能
+        paymentDiv.querySelectorAll('.tab-btn').forEach(btn => {
+          btn.addEventListener('click', function() {
+            // 切换按钮样式
+            paymentDiv.querySelectorAll('.tab-btn').forEach(b => {
+              b.classList.remove('active', 'bg-amber-500', 'text-white');
+              b.classList.add('bg-gray-200', 'dark:bg-gray-700');
+            });
+            this.classList.add('active', 'bg-amber-500', 'text-white');
+            this.classList.remove('bg-gray-200', 'dark:bg-gray-700');
+            
+            // 切换内容
+            const tab = this.dataset.tab;
+            paymentDiv.querySelector('#password-tab').classList.toggle('hidden', tab !== 'password');
+            paymentDiv.querySelector('#wechat-tab').classList.toggle('hidden', tab !== 'wechat');
+          });
+        });
+        
+        // 密码输入确认
+        paymentDiv.querySelector('#password-tab button').addEventListener('click', function() {
+          const input = paymentDiv.querySelector('#password-tab input');
+          if (input.value === 'liuren2026') {
+            alert('解锁成功！');
+            paymentDiv.remove(); // 移除付费选项
+          } else {
+            alert('密码错误');
+          }
+        });
+        
+        // 演示用的支付成功按钮（实际需要后端）
+        paymentDiv.querySelector('#wechat-tab').insertAdjacentHTML('beforeend', `
+          <button class="w-full mt-2 py-2 bg-green-500 text-white rounded-lg text-sm">
+            我已支付（演示用）
+          </button>
+        `);
+      }
+    }
+  </script>
+  
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      transition: background-image 0.5s ease;
+    }
+    /* 弹窗背景样式 */
+    .fixed.inset-0.z-\\[100\\] .relative {
+      background-size: cover !important;
+      background-position: center !important;
+      position: relative;
+      overflow: hidden;
+    }
+    .fixed.inset-0.z-\\[100\\] .relative::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 0;
+    }
+    .fixed.inset-0.z-\\[100\\] .relative > * {
+      position: relative;
+      z-index: 1;
+    }
+    .dark .fixed.inset-0.z-\\[100\\] .relative::before {
+      background: rgba(0,0,0,0.6);
+    }
+  </style>
+  
+  <script type="module" crossorigin src="./index-xWH0CqK6.js"></script>
+  <link rel="stylesheet" crossorigin href="./index-DlgEhZsr.css">
+</head>
+
+<body>
+  <div id="root"></div>
+</body>
+</html>
